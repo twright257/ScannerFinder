@@ -18,20 +18,27 @@ import org.jnetpcap.protocol.tcpip.Http;
 import org.jnetpcap.protocol.tcpip.Tcp;
 
 /**
- * ScannerFinder is used to read through a pcap file and print the IP addresses that send more than three times as many SYN requests as the SYNACK that they receive 
+ * ScannerFinder is used to read through a pcap file that is taken as a command line argument and print the IP 
+ * addresses that send more than three times as many SYN requests as the SYNACK that they receive. 
+ *  
  * Tyler Wright
  * March 22, 2015
  * 
  */
 public class ScannerFinder {
-	private final String FILENAME = "lbl-internal.20041004-1305.port002.dump.pcap";	//file path for pcap dump file
+	//private final String FILENAME = "lbl-internal.20041004-1305.port002.dump.pcap";	//file path for pcap dump file
+	private String FILENAME; 
 	private final StringBuilder errbuf = new StringBuilder();
-	private final Pcap pcap = Pcap.openOffline(FILENAME, errbuf);
+	private Pcap pcap;
 	
+	public ScannerFinder(String filePath) {
+		FILENAME = filePath; 
+		pcap = Pcap.openOffline(FILENAME, errbuf);
+	}
 	
 	//method for parsing pcap file and printing out up address of possible port scanners
 	public void read() {
-		//if pcap empty, return 
+		//if pcap empty, print file error and return 
 		if (pcap == null) {
 			System.err.println(errbuf); // Error is stored in errbuf if any
 			return;
@@ -97,7 +104,7 @@ public class ScannerFinder {
 	}
 	
 	public static void main(String[] args) {
-		ScannerFinder s = new ScannerFinder(); 
+		ScannerFinder s = new ScannerFinder(args[0]); 
 		s.read(); 
 	}
 }
