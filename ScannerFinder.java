@@ -18,34 +18,33 @@ import org.jnetpcap.protocol.tcpip.Http;
 import org.jnetpcap.protocol.tcpip.Tcp;
 
 /**
- * This example demonstrates various usage scenerios for jNetPcap API. The test
- * file used in this example can be found under the "tests" directory located
- * under the root installation directory of the source package. The tests
- * directory is not normally provided with binary distribution of jnetpcap. The
- * test file contains 483 packets most of which are http or tcp segments.
+ * ScannerFinder is used to read through a pcap file and print the IP addresses that send more than three times as many SYN requests as the SYNACK that they receive 
+ * Tyler Wright
+ * March 22, 2015
  * 
- * @author Mark Bednarczyk
- * @author Sly Technologies, Inc.
  */
 public class ScannerFinder {
-	private final String FILENAME = "lbl-internal.20041004-1305.port002.dump.pcap";
+	private final String FILENAME = "lbl-internal.20041004-1305.port002.dump.pcap";	//file path for pcap dump file
 	private final StringBuilder errbuf = new StringBuilder();
 	private final Pcap pcap = Pcap.openOffline(FILENAME, errbuf);
 	
+	
+	//method for parsing pcap file and printing out up address of possible port scanners
 	public void read() {
+		//if pcap empty, return 
 		if (pcap == null) {
 			System.err.println(errbuf); // Error is stored in errbuf if any
 			return;
 		}
-		HashMap ipHash = new HashMap(); 
+		HashMap ipHash = new HashMap(); 	//hash map to store ip addresses with sy and ack numbers 
 		final PcapPacket packet = new PcapPacket(JMemory.POINTER);
 		final Tcp tcp = new Tcp();
+		//loop through entire file, getting each packet
 		pcap.loop(Pcap.LOOP_INFINITE, new JPacketHandler<StringBuilder>() {
-
 			final Tcp tcp = new Tcp();
 			final Ip4 ip = new Ip4();
 			Payload payload = new Payload();
-
+			//get next packet
 			public void nextPacket(JPacket packet, StringBuilder errbuf) {
 				Tcp tcp = new Tcp();
 
@@ -53,12 +52,13 @@ public class ScannerFinder {
 				byte[] dIP = new byte[4];
 				String sourceIP = "";
 				String destIP = "";
+				//if packet has ip and tcp header, examine further
 				if (packet.hasHeader(ip) && packet.hasHeader(tcp)) {
 					sIP = packet.getHeader(ip).source();
-					sourceIP = org.jnetpcap.packet.format.FormatUtils.ip(sIP);
+					sourceIP = org.jnetpcap.packet.format.FormatUtils.ip(sIP);	//source ip address as string 
 					dIP = packet.getHeader(ip).destination();
-					destIP = org.jnetpcap.packet.format.FormatUtils.ip(dIP);
-					
+					destIP = org.jnetpcap.packet.format.FormatUtils.ip(dIP);	//destination ip address as string 
+					//if packet contains only SYN, increment value for sender IP
 					if (tcp.flags_SYN() && !tcp.flags_ACK()) {
 						if (ipHash.containsKey(sourceIP)) {
 							int synVal = (int)(ipHash.get(sourceIP)); 
@@ -70,10 +70,7 @@ public class ScannerFinder {
 						} else {
 							ipHash.put(sourceIP, 1);
 						}
-//						System.out.println("SYN");
-//						System.out.println(ipHash.get(sourceIP));
-//						System.out.println("Source IP: " + sourceIP);
-//						System.out.println("Destination IP: " + destIP);
+					//packet contains SYN and ACK, decrement value for receiving IP
 					} else if (tcp.flags_SYN()) {
 						if (ipHash.containsKey(destIP)) {
 							int synVal = (int)(ipHash.get(destIP)); 
@@ -85,56 +82,17 @@ public class ScannerFinder {
 						} else {
 							ipHash.put(destIP, -1);
 						}
-//						System.out.println("SYNACK");
-//						System.out.println(ipHash.get(sourceIP));
-//						System.out.println("Source IP: " + sourceIP);
-//						System.out.println("Destination IP: " + destIP);
 					}
 				}
 			}
 			
 		}, errbuf);
+		//for each IP, print those with > 3 times syn to synack
 		for (Object key : ipHash.keySet()) {
-			if ((int)ipHash.get(key) >= 2) {
+			if ((int)ipHash.get(key) > 2) {
 				System.out.println(key);
 			}
 		}
-		/*
-		 * Now that we have captured our 10 packets, lets use Pcap.nextEx to get
-		 * the next 5 packets. We will also reset the frame number back to 0
-		 * just so we can see how its done. Each scanner keeps track of its own
-		 * frame numbers, so we want to get the default one, for this thread,
-		 * and change it there.
-		 */
-
-		/*
-		 * We still haven't read all the packets from our offline file. Here is
-		 * an easier way to retrieve all the packets while grouping them into
-		 * flows. jNetPcap provides a neat little class that does all of the
-		 * above work for us. Its called JFlowMap, not only that it implements a
-		 * JPacketHandler interface suitable for usage with Pcap.loop or
-		 * Pcap.dispatch calls and it will add all packets received into
-		 * appropriate flows.
-		 */
-		JFlowMap superFlowMap = new JFlowMap();
-
-		/*
-		 * So lets finish this file off, and read the remaining packets into our
-		 * new superFlowMap and do a pretty print of all the flows it finds. The
-		 * 3rd argument to Pcap.loop is unused so we just set it to null.
-		 * Pcap.LOOP_INFINITE flag tells the Pcap.loop method to read all the
-		 * packets until the end of file. Since we already read some packets,
-		 * this will read remaining packets from the current position in the
-		 * file until the end.
-		 */
-		// pcap.loop(100000, superFlowMap, null);
-
-		// System.out.printf("superFlowMap::%s%n", superFlowMap);
-
-		/*
-		 * Now we have read the remaining packets and we no longer need to keep
-		 * the pcap file open.
-		 */
 		pcap.close();
 	}
 	
